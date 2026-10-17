@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String             @id @default(cuid())
+  email        String             @unique
+  displayName  String             @default("Friend")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  habits       Habit[]
+  completions  HabitCompletion[]
+  journals     JournalEntry[]
+  foods        Food[]
+  foodLogs     FoodLog[]
+  target       NutritionTarget?
+  transactions PointTransaction[]
+  rewards      Reward[]
+  redemptions  RewardRedemption[]
+  reviews      WeeklyReview[]
+  achievements UserAchievement[]
+}
+
+model Habit {
+  id          String            @id @default(cuid())
+  userId      String
+  name        String
+  description String            @default("")
+  category    String            @default("Personal Growth")
+  icon        String            @default("circle")
+  points      Int               @default(10)
+  weekdays    Int[]             @default([0, 1, 2, 3, 4, 5, 6])
+  startDate   DateTime          @db.Date
+  status      String            @default("ACTIVE")
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completions HabitCompletion[]
+
+  @@index([userId, status])
+}
+
+model HabitCompletion {
+  id        String   @id @default(cuid())
+  userId    String
+  habitId   String
+  date      DateTime @db.Date
+  completed Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@index([userId, date])
+}
+
+model JournalEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  morning   Json     @default("{}")
+  evening   Json     @default("{}")
+  freeWrite String   @default("")
+  mood      String?
+  energy    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model NutritionTarget {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  calories  Int      @default(2200)
+  protein   Decimal  @default(120) @db.Decimal(8, 2)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Food {
+  id          String    @id @default(cuid())
+  userId      String?
+  name        String
+  brand       String?
+  category    String    @default("Other")
+  basis       String    @default("100g")
+  servingUnit String    @default("serving")
+  calories    Decimal   @db.Decimal(10, 2)
+  protein     Decimal   @db.Decimal(8, 2)
+  isEstimate  Boolean   @default(true)
+  isCustom    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs        FoodLog[]
+
+  @@index([userId, name])
+}
+
+model FoodLog {
+  id               String   @id @default(cuid())
+  userId           String
+  foodId           String?
+  date             DateTime @db.Date
+  foodName         String
+  brand            String?
+  meal             String
+  quantity         Decimal  @db.Decimal(10, 2)
+  unit             String
+  basis            String
+  caloriesPerBasis Decimal  @db.Decimal(10, 2)
+  proteinPerBasis  Decimal  @db.Decimal(8, 2)
+  calories         Decimal  @db.Decimal(10, 2)
+  protein          Decimal  @db.Decimal(8, 2)
+  notes            String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  food             Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+}
+
+model PointTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  eventKey  String   @unique
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Reward {
+  id          String             @id @default(cuid())
+  userId      String
+  name        String
+  description String             @default("")
+  icon        String             @default("gift")
+  cost        Int
+  isAvailable Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemptions RewardRedemption[]
+}
+
+model RewardRedemption {
+  id          String   @id @default(cuid())
+  userId      String
+  rewardId    String
+  eventKey    String   @unique
+  rewardName  String
+  pointsSpent Int
+  redeemedAt  DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward      Reward   @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+
+  @@index([userId, redeemedAt])
+}
+
+model WeeklyReview {
+  id        String   @id @default(cuid())
+  userId    String
+  weekStart DateTime @db.Date
+  answers   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+}
+
+model UserAchievement {
+  id          String   @id @default(cuid())
+  userId      String
+  achievement String
+  unlockedAt  DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievement])
+}

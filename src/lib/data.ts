@@ -103,10 +103,11 @@ async function seedPersonalData(userId: string) {
 export async function getDashboardSnapshot(
   user: { id: string; displayName: string },
   date = localDateString(),
+  trendDays: 7 | 30 | 90 = 7,
 ): Promise<DashboardSnapshot> {
   await seedPersonalData(user.id);
   const dbDate = dateFromString(date);
-  const weekStart = dateFromString(previousDate(date, 6));
+  const trendStart = dateFromString(previousDate(date, trendDays - 1));
   const datesInMonth = monthDates(date);
   const monthStart = dateFromString(datesInMonth[0]);
   const monthEnd = dateFromString(datesInMonth[datesInMonth.length - 1]);
@@ -125,8 +126,8 @@ export async function getDashboardSnapshot(
     transactions,
     journal,
     weekHabits,
-    weekCompletions,
-    weekLogs,
+    trendCompletions,
+    trendLogs,
     monthCompletions,
     historyCompletions,
     review,
@@ -143,8 +144,8 @@ export async function getDashboardSnapshot(
       prisma.pointTransaction.aggregate({ where: { userId: user.id }, _sum: { amount: true } }),
       prisma.journalEntry.findUnique({ where: { userId_date: { userId: user.id, date: dbDate } } }),
       prisma.habit.findMany({ where: { userId: user.id, status: "ACTIVE" } }),
-      prisma.habitCompletion.findMany({ where: { userId: user.id, date: { gte: weekStart, lte: dbDate }, completed: true } }),
-      prisma.foodLog.findMany({ where: { userId: user.id, date: { gte: weekStart, lte: dbDate } } }),
+      prisma.habitCompletion.findMany({ where: { userId: user.id, date: { gte: trendStart, lte: dbDate }, completed: true } }),
+      prisma.foodLog.findMany({ where: { userId: user.id, date: { gte: trendStart, lte: dbDate } } }),
       prisma.habitCompletion.findMany({ where: { userId: user.id, date: { gte: monthStart, lte: monthEnd }, completed: true } }),
       prisma.habitCompletion.findMany({ where: { userId: user.id, date: { lte: dbDate }, completed: true } }),
       prisma.weeklyReview.findUnique({
@@ -153,10 +154,15 @@ export async function getDashboardSnapshot(
     ]);
 
   const completedIds = new Set(completions.filter((item) => item.completed).map((item) => item.habitId));
-  const completionLookup = new Set(weekCompletions.map((item) => `${item.habitId}:${databaseDateString(item.date)}`));
-  const trend: DailyTrend[] = Array.from({ length: 7 }, (_, index) => {
-    const dayString = previousDate(date, 6 - index);
-    const dayLogs = weekLogs.filter((item) => databaseDateString(item.date) === dayString);
+  const completionLookup = new Set(trendCompletions.map((item) => `${item.habitId}:${databaseDateString(item.date)}`));
+  const weeklyCompletionLookup = new Set(
+    trendCompletions
+      .filter((item) => databaseDateString(item.date) >= previousDate(date, 6))
+      .map((item) => `${item.habitId}:${databaseDateString(item.date)}`),
+  );
+  const trend: DailyTrend[] = Array.from({ length: trendDays }, (_, index) => {
+    const dayString = previousDate(date, trendDays - index - 1);
+    const dayLogs = trendLogs.filter((item) => databaseDateString(item.date) === dayString);
     const tracked = dayLogs.length > 0;
     return {
       date: dayString,
@@ -171,13 +177,13 @@ export async function getDashboardSnapshot(
       return habit.weekdays.includes(weekdayFromString(dayString)) && databaseDateString(habit.startDate) <= dayString ? 1 : 0;
     }).reduce<number>((a, b) => a + b, 0);
   }, 0);
-  const weeklyDone = Array.from(completionLookup).filter((key) => {
+  const weeklyDone = Array.from(weeklyCompletionLookup).filter((key) => {
     const [habitId, dateString] = key.split(":");
     const habit = weekHabits.find((item) => item.id === habitId);
     return habit?.weekdays.includes(weekdayFromString(dateString)) && databaseDateString(habit.startDate) <= dateString;
   }).length;
-  const habitTrend = Array.from({ length: 7 }, (_, index) => {
-    const dayString = previousDate(date, 6 - index);
+  const habitTrend = Array.from({ length: trendDays }, (_, index) => {
+    const dayString = previousDate(date, trendDays - index - 1);
     const due = weekHabits.filter(
       (habit) => habit.weekdays.includes(weekdayFromString(dayString)) && databaseDateString(habit.startDate) <= dayString,
     );
@@ -188,15 +194,27 @@ export async function getDashboardSnapshot(
       completed: due.filter((habit) => completionLookup.has(`${habit.id}:${dayString}`)).length,
     };
   });
+  const weeklyHabitTrend = Array.from({ length: 7 }, (_, index) => {
+    const dayString = previousDate(date, 6 - index);
+    const due = weekHabits.filter(
+      (habit) => habit.weekdays.includes(weekdayFromString(dayString)) && databaseDateString(habit.startDate) <= dayString,
+    );
+    return {
+      date: dayString,
+      day: weekdayLabel(dayString),
+      scheduled: due.length,
+      completed: due.filter((habit) => weeklyCompletionLookup.has(`${habit.id}:${dayString}`)).length,
+    };
+  });
   const habitPerformance = weekHabits.map((habit) => {
-    const scheduled = habitTrend.filter((day) =>
+    const scheduled = weeklyHabitTrend.filter((day) =>
       habit.weekdays.includes(weekdayFromString(day.date)) && databaseDateString(habit.startDate) <= day.date,
     );
     return {
       id: habit.id,
       name: habit.name,
       scheduled: scheduled.length,
-      completed: scheduled.filter((day) => completionLookup.has(`${habit.id}:${day.date}`)).length,
+      completed: scheduled.filter((day) => weeklyCompletionLookup.has(`${habit.id}:${day.date}`)).length,
     };
   });
   const monthCompleted = new Set(monthCompletions.map((item) => `${item.habitId}:${databaseDateString(item.date)}`));

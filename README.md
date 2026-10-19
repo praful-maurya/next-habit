@@ -39,8 +39,9 @@ The first signed-in dashboard request creates an application profile linked to t
 - Habit creation, weekday completion, pause/resume, archive, and reversible completion points.
 - Guided morning/evening journal prompts, mood, energy, free writing, and date-specific saves.
 - Food search, custom food saving, per-100-g and per-serving calculations, meal grouping, editable quantity/meal, duplication, deletion, configurable targets, and a seven-day calorie chart.
-- A reward shelf with transaction-backed redemption and balance checks.
-- Responsive navigation and layouts for mobile and desktop.
+- A reward shelf with transaction-backed redemption, balance checks, and streak milestones calculated from recorded activity.
+- Analytics for habit completion and recorded calorie/protein trends over 7, 30, or 90 days.
+- Responsive navigation and layouts for mobile and desktop, with a collapsible desktop sidebar and reduced-motion support.
 
 ## Authentication and data isolation
 

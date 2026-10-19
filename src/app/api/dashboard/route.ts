@@ -13,8 +13,13 @@ export async function GET(request: NextRequest) {
   if (!parsedDate.success) {
     return NextResponse.json({ error: "Date must use YYYY-MM-DD format." }, { status: 400 });
   }
+  const requestedRange = request.nextUrl.searchParams.get("range") ?? "7";
+  if (requestedRange !== "7" && requestedRange !== "30" && requestedRange !== "90") {
+    return NextResponse.json({ error: "Range must be 7, 30, or 90 days." }, { status: 400 });
+  }
   try {
-    return NextResponse.json(await getDashboardSnapshot(authentication.user, date));
+    const range = requestedRange === "90" ? 90 : requestedRange === "30" ? 30 : 7;
+    return NextResponse.json(await getDashboardSnapshot(authentication.user, date, range));
   } catch (error) {
     console.error("Unable to load the journal dashboard.", error);
     return NextResponse.json(

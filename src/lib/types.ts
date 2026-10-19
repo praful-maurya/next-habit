@@ -40,9 +40,28 @@ export type RewardItem = {
   id: string;
   name: string;
   description: string;
+  category: string;
   icon: string;
-  cost: number;
-  isAvailable: boolean;
+  isActive: boolean;
+};
+
+export type WeeklyDisciplineItem = {
+  id: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  plannedCount: number;
+  completedCount: number;
+  score: number;
+  requiredThreshold: number;
+  isEligible: boolean;
+  finalized: boolean;
+};
+
+export type RewardRedemptionItem = {
+  id: string;
+  rewardId: string;
+  rewardName: string;
+  redeemedAt: string;
 };
 
 export type JournalItem = {
@@ -93,6 +112,8 @@ export type DashboardSnapshot = {
   foodLogs: FoodLogItem[];
   foods: FoodItem[];
   rewards: RewardItem[];
+  weeklyDiscipline: WeeklyDisciplineItem;
+  rewardRedemptions: RewardRedemptionItem[];
   points: number;
   caloriesTarget: number;
   proteinTarget: number;
@@ -116,6 +137,18 @@ export const emptySnapshot = (date: string): DashboardSnapshot => ({
   foodLogs: [],
   foods: [],
   rewards: [],
+  weeklyDiscipline: {
+    id: "",
+    weekStartDate: date,
+    weekEndDate: date,
+    plannedCount: 0,
+    completedCount: 0,
+    score: 0,
+    requiredThreshold: 80,
+    isEligible: false,
+    finalized: false,
+  },
+  rewardRedemptions: [],
   points: 0,
   caloriesTarget: 2200,
   proteinTarget: 120,

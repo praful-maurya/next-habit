@@ -16,7 +16,7 @@ export default async function AuthPage({ path }: { path: AuthViewPath }) {
         <div className="auth-brand">
           <span className="auth-brand-mark">D</span>
           <span>
-            <strong>The Daily Practice</strong>
+            <strong>Next Habit</strong>
             <small>MY DISCIPLINE JOURNAL</small>
           </span>
         </div>

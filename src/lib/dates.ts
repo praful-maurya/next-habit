@@ -19,6 +19,11 @@ export function previousDate(value: string, days = 1) {
   return databaseDateString(date);
 }
 
+export function weekPeriod(value: string) {
+  const start = previousDate(value, (weekdayFromString(value) + 6) % 7);
+  return { weekStartDate: start, weekEndDate: previousDate(start, -6) };
+}
+
 export function isFutureDate(value: string) {
   return isAfter(dateFromString(value), dateFromString(localDateString()));
 }

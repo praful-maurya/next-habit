@@ -39,7 +39,7 @@ The first signed-in dashboard request creates an application profile linked to t
 - Habit creation, weekday completion, pause/resume, archive, and reversible completion points.
 - Guided morning/evening journal prompts, mood, energy, free writing, and date-specific saves.
 - Food search, custom food saving, per-100-g and per-serving calculations, meal grouping, editable quantity/meal, duplication, deletion, configurable targets, and a seven-day calorie chart.
-- A reward shelf with transaction-backed redemption, balance checks, and streak milestones calculated from recorded activity.
+- A Reward Vault that calculates a server-persisted Monday–Sunday discipline score from scheduled habit occurrences, unlocks at 80%, and supports one redemption per active reward each eligible week.
 - Analytics for habit completion and recorded calorie/protein trends over 7, 30, or 90 days.
 - Responsive navigation and layouts for mobile and desktop, with a collapsible desktop sidebar and reduced-motion support.
 
@@ -54,6 +54,8 @@ The first signed-in dashboard request creates an application profile linked to t
 Calendar days and food logs are stored as PostgreSQL `DATE` values represented as `YYYY-MM-DD` strings in the application to avoid UTC timestamp day shifts. Food log rows preserve nutrition values at logging time, so later edits to a reusable food do not rewrite historical intake. No external nutrition API is configured; food search uses built-in estimated references and user-entered foods.
 
 The Prisma scripts load `.env.local`, where `neon deploy` writes `DATABASE_URL_UNPOOLED`. For local schema changes, use `npm run db:migrate -- --name <migration-name>`. For production, apply committed migrations with `npm run db:deploy`.
+
+Weekly discipline scores count scheduled occurrences for active habits; missed past occurrences count as incomplete, while today's unfinished and future occurrences do not count against the live score. The score for the prior week is finalized on the next dashboard load or before a habit status change, preserving the recorded snapshot from later edits. Historical scores are not backfilled for weeks before this feature is deployed.
 
 ## Checks
 

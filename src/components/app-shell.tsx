@@ -17,11 +17,15 @@ import {
   Copy,
   Flame,
   Gift,
+  Gamepad2,
   Heart,
   Leaf,
   LoaderCircle,
+  LockKeyhole,
+  Map,
   Menu,
   MoreHorizontal,
+  Music2,
   NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -33,6 +37,8 @@ import {
   Target,
   Trash2,
   Trophy,
+  Users,
+  Utensils,
   X,
 } from "lucide-react";
 import {
@@ -136,6 +142,11 @@ function IconForHabit({ name }: { name: string }) {
     coffee: Coffee,
     gift: Gift,
     "clapperboard": Sparkles,
+    users: Users,
+    "music-2": Music2,
+    utensils: Utensils,
+    "gamepad-2": Gamepad2,
+    map: Map,
   };
   const Icon = icons[name] ?? Sprout;
   return <Icon size={18} strokeWidth={1.8} aria-hidden="true" />;
@@ -264,6 +275,12 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
     return snapshot.habits.filter((habit) => habit.status === "ACTIVE" && habit.weekdays.includes(today));
   }, [selectedDate, snapshot.habits]);
   const completedHabits = scheduledHabits.filter((habit) => habit.completed).length;
+  const redeemedRewardIds = useMemo(
+    () => new Set(snapshot.rewardRedemptions.map((redemption) => redemption.rewardId)),
+    [snapshot.rewardRedemptions],
+  );
+  const weeklyDiscipline = snapshot.weeklyDiscipline;
+  const disciplineProgress = Math.min(100, weeklyDiscipline.score);
   const habitPercent = scheduledHabits.length ? (completedHabits / scheduledHabits.length) * 100 : 0;
   const calories = snapshot.foodLogs.reduce((sum, entry) => sum + entry.calories, 0);
   const protein = snapshot.foodLogs.reduce((sum, entry) => sum + entry.protein, 0);
@@ -414,7 +431,8 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
   };
 
   const redeemReward = async (rewardId: string) => {
-    await submit("/api/redeem", "POST", { rewardId, requestId: crypto.randomUUID() });
+    const saved = await submit("/api/redeem", "POST", { rewardId, requestId: crypto.randomUUID() });
+    if (saved) setNotice("Reward redeemed for this week");
   };
 
   const addHabit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -696,7 +714,31 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
 
           {section === "rewards" && (
             <section className="module-page">
-              <div className="module-title-row"><div><p className="eyebrow">CELEBRATE YOUR CONSISTENCY</p><h1>Little <em>rewards.</em></h1><p className="welcome-subtitle">A thoughtful way to celebrate the effort you put in.</p></div><div className="reward-balance"><Sparkles size={18} /><span><strong>{formatNumber(snapshot.points)}</strong> points available</span></div></div>
+              <div className="module-title-row"><div><p className="eyebrow">CELEBRATE YOUR CONSISTENCY</p><h1>Reward <em>vault.</em></h1><p className="welcome-subtitle">Keep the commitments you planned. Choose a reward when your week reaches 80%.</p></div><div className="reward-balance"><Trophy size={18} /><span><strong>{weeklyDiscipline.isEligible ? "Unlocked" : `${weeklyDiscipline.requiredThreshold}%`}</strong> weekly threshold</span></div></div>
+              <article className="panel-card vault-score-panel">
+                <div className="vault-score-heading">
+                  <div><p className="eyebrow">THIS WEEK · MONDAY–SUNDAY</p><h2>Your weekly discipline score</h2><span>{weeklyDiscipline.weekStartDate} – {weeklyDiscipline.weekEndDate}</span></div>
+                  <strong className={`vault-score-value ${weeklyDiscipline.isEligible ? "eligible" : ""}`}>{weeklyDiscipline.score.toFixed(1)}%</strong>
+                </div>
+                <div
+                  className={`vault-score-track ${weeklyDiscipline.isEligible ? "eligible" : ""}`}
+                  role="progressbar"
+                  aria-label="Weekly discipline score"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(weeklyDiscipline.score)}
+                  aria-valuetext={`${weeklyDiscipline.score.toFixed(1)} percent; ${weeklyDiscipline.completedCount} of ${weeklyDiscipline.plannedCount} planned habit commitments completed`}
+                >
+                  <span style={{ width: `${disciplineProgress}%` }} />
+                  <i aria-hidden="true" />
+                </div>
+                <div className="vault-score-foot">
+                  <span>{weeklyDiscipline.completedCount} of {weeklyDiscipline.plannedCount} planned commitments complete</span>
+                  <strong>{weeklyDiscipline.isEligible ? "Reward Vault unlocked" : `${weeklyDiscipline.requiredThreshold}% to unlock`}</strong>
+                </div>
+                {weeklyDiscipline.plannedCount === 0 && <p className="vault-score-note">No planned habit occurrences yet this week. Add a habit schedule to begin building your score.</p>}
+                {!weeklyDiscipline.finalized && <p className="vault-score-note">Future habits don&apos;t count against your score. Today&apos;s unfinished habits count after the day ends.</p>}
+              </article>
               <div className="rewards-note"><Heart size={17} /><span>Rewards are a celebration, not a measure of your worth. Rest and care are always yours to take.</span></div>
               <article className="panel-card milestone-panel">
                 <div className="panel-heading">
@@ -711,9 +753,32 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
                 </div>
                 {nextStreakMilestone && <div className="milestone-progress"><div><span>Next: {nextStreakMilestone.label}</span><span>{Math.min(snapshot.streaks.current, nextStreakMilestone.days)} / {nextStreakMilestone.days} days</span></div><div className="thin-progress"><span style={{ width: `${Math.min(100, snapshot.streaks.current / nextStreakMilestone.days * 100)}%` }} /></div></div>}
               </article>
-              <div className="rewards-grid">{snapshot.rewards.map((reward, index) => <article className="panel-card reward-card" key={reward.id}><div className={`reward-art reward-art-${index % 3}`}><IconForHabit name={reward.icon} /><Sparkles size={13} className="reward-spark" /></div><div className="reward-card-body"><span className="eyebrow">A LITTLE CELEBRATION</span><h2>{reward.name}</h2><p>{reward.description}</p><div className="reward-cost"><span><Sparkles size={15} /> {reward.cost} points</span><button className="redeem-button" disabled={!snapshot.configured || snapshot.points < reward.cost || saving} onClick={() => void redeemReward(reward.id)}>{saving ? <LoaderCircle size={15} className="spin" /> : "Redeem"}</button></div></div></article>)}</div>
-              {snapshot.rewards.length === 0 && <div className="panel-card empty-state"><Gift size={27} /><h3>Your reward shelf is waiting</h3><p>Keep practicing to collect points for a celebration.</p></div>}
-              <div className="rewards-footer"><Trophy size={17} /><span>Each habit completion earns points once. Undoing a completion also reverses its points.</span></div>
+              <div className="rewards-grid">{snapshot.rewards.map((reward, index) => {
+                const redeemed = redeemedRewardIds.has(reward.id);
+                return <article className={`panel-card reward-card ${!weeklyDiscipline.isEligible ? "reward-locked" : ""} ${redeemed ? "reward-redeemed" : ""}`} key={reward.id}>
+                  <div className={`reward-art reward-art-${index % 3}`}><IconForHabit name={reward.icon} /><Sparkles size={13} className="reward-spark" /></div>
+                  <div className="reward-card-body">
+                    <span className="eyebrow">{reward.category.toUpperCase()}</span>
+                    <h2>{reward.name}</h2>
+                    <p>{reward.description}</p>
+                    <div className="reward-cost">
+                      <span className="reward-status">
+                        {redeemed ? <Check size={13} /> : !weeklyDiscipline.isEligible ? <LockKeyhole size={13} /> : <Sparkles size={13} />}
+                        {redeemed ? "Redeemed this week" : !weeklyDiscipline.isEligible ? "Unlock at 80%" : "Ready to enjoy"}
+                      </span>
+                      <button className="redeem-button" disabled={!snapshot.configured || !weeklyDiscipline.isEligible || redeemed || saving} onClick={() => void redeemReward(reward.id)}>
+                        {saving ? <LoaderCircle size={15} className="spin" /> : redeemed ? "Redeemed" : weeklyDiscipline.isEligible ? "Redeem" : "Locked"}
+                      </button>
+                    </div>
+                  </div>
+                </article>;
+              })}</div>
+              {snapshot.rewards.length === 0 && <div className="panel-card empty-state"><Gift size={27} /><h3>No active rewards yet</h3><p>Active rewards added to your vault will appear here.</p></div>}
+              {snapshot.rewardRedemptions.length > 0 && <article className="panel-card vault-history">
+                <div className="panel-heading"><div><p className="eyebrow">THIS WEEK&apos;S CLAIMS</p><h2>Redemption history</h2></div><span className="soft-tag">{snapshot.rewardRedemptions.length} claimed</span></div>
+                {snapshot.rewardRedemptions.map((redemption) => <div className="vault-history-row" key={redemption.id}><span className="vault-history-icon"><Check size={15} /></span><strong>{redemption.rewardName}</strong><time dateTime={redemption.redeemedAt}>{new Date(redemption.redeemedAt).toLocaleDateString("en", { month: "short", day: "numeric" })}</time></div>)}
+              </article>}
+              <div className="rewards-footer"><Trophy size={17} /><span>Rewards unlock at 80% of the habit occurrences you planned this week. You can redeem each reward once per week.</span></div>
             </section>
           )}
 
@@ -764,7 +829,7 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
             </section>
           )}
 
-          <footer className="app-footer"><span><Sprout size={14} /> The Daily Practice</span><span>Made for the person you&apos;re becoming.</span></footer>
+          <footer className="app-footer"><span><Sprout size={14} /> Next Habit</span><span>Made for the person you&apos;re becoming.</span></footer>
         </div>
       </main>
     </div>

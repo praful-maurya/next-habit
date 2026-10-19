@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/auth/app-user";
+import { localDateString } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { getWeeklyDisciplineScore } from "@/lib/reward-vault";
 import { z } from "zod";
 
 const statusSchema = z.object({ status: z.enum(["ACTIVE", "PAUSED", "ARCHIVED"]) });
@@ -15,6 +17,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const user = authentication.user;
     const { id } = await params;
+    await getWeeklyDisciplineScore(user.id, localDateString());
     const result = await prisma.habit.updateMany({
       where: { id, userId: user.id },
       data: { status: payload.data.status },

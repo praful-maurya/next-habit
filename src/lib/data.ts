@@ -11,6 +11,7 @@ import {
   weekdayLabel,
 } from "@/lib/dates";
 import type { DashboardSnapshot, DailyTrend } from "@/lib/types";
+import { getWeeklyDisciplineScore } from "@/lib/reward-vault";
 
 const sampleHabits = [
   { name: "Move my body", category: "Fitness", icon: "activity", points: 10 },
@@ -20,9 +21,12 @@ const sampleHabits = [
 ];
 
 const sampleRewards = [
-  { name: "A slow Sunday morning", description: "Make time for a restful start.", icon: "coffee", cost: 60 },
-  { name: "Movie night", description: "Pick a film and settle in.", icon: "clapperboard", cost: 120 },
-  { name: "A little something", description: "Choose a small treat for yourself.", icon: "gift", cost: 250 },
+  { name: "Movie night", description: "Choose a film and enjoy an evening in.", category: "At home", icon: "clapperboard" },
+  { name: "Dinner with friends", description: "Make time for a meal and good company.", category: "With friends", icon: "users" },
+  { name: "Clubbing night", description: "Enjoy a night out and dance if you feel like it.", category: "Night out", icon: "music-2" },
+  { name: "Favourite meal", description: "Set aside time to savour a meal you love.", category: "Food & care", icon: "utensils" },
+  { name: "Gaming session", description: "Make room for a guilt-free gaming session.", category: "At home", icon: "gamepad-2" },
+  { name: "Day trip", description: "Explore somewhere new for the day.", category: "Adventure", icon: "map" },
 ];
 
 const starterFoods = [
@@ -42,16 +46,24 @@ const starterFoods = [
 
 async function seedPersonalData(userId: string) {
   const firstHabitId = `seed-${userId}-habit-${sampleHabits[0].icon}`;
-  const firstRewardId = `seed-${userId}-reward-${sampleRewards[0].icon}`;
   const firstFoodId = `seed-food-${starterFoods[0].name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  const [targetSeeded, habitSeeded, rewardSeeded, foodSeeded] = await Promise.all([
+  const [targetSeeded, habitSeeded, rewardCount, foodSeeded] = await Promise.all([
     prisma.nutritionTarget.findUnique({ where: { userId }, select: { id: true } }),
     prisma.habit.findUnique({ where: { id: firstHabitId }, select: { id: true } }),
-    prisma.reward.findUnique({ where: { id: firstRewardId }, select: { id: true } }),
+    prisma.reward.count({
+      where: {
+        userId,
+        id: {
+          in: sampleRewards.map(
+            (reward) => `seed-${userId}-vault-${reward.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+          ),
+        },
+      },
+    }),
     prisma.food.findUnique({ where: { id: firstFoodId }, select: { id: true } }),
   ]);
 
-  if (!targetSeeded || !habitSeeded || !rewardSeeded || !foodSeeded) {
+  if (!targetSeeded || !habitSeeded || rewardCount < sampleRewards.length || !foodSeeded) {
     await prisma.$transaction(
       async (transaction) => {
         await transaction.$executeRaw`SELECT pg_advisory_xact_lock(20261017, 1)`;
@@ -74,11 +86,11 @@ async function seedPersonalData(userId: string) {
           });
         }
         for (const reward of sampleRewards) {
-          const id = `seed-${userId}-reward-${reward.icon}`;
+          const id = `seed-${userId}-vault-${reward.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
           await transaction.reward.upsert({
             where: { id },
             update: {},
-            create: { id, userId, ...reward },
+            create: { id, userId, ...reward, cost: 0 },
           });
         }
         for (const food of starterFoods) {
@@ -106,6 +118,7 @@ export async function getDashboardSnapshot(
   trendDays: 7 | 30 | 90 = 7,
 ): Promise<DashboardSnapshot> {
   await seedPersonalData(user.id);
+  const weeklyDisciplineScore = await getWeeklyDisciplineScore(user.id, localDateString());
   const dbDate = dateFromString(date);
   const trendStart = dateFromString(previousDate(date, trendDays - 1));
   const datesInMonth = monthDates(date);
@@ -131,6 +144,7 @@ export async function getDashboardSnapshot(
     monthCompletions,
     historyCompletions,
     review,
+    rewardRedemptions,
   ] =
     await Promise.all([
       prisma.habitCompletion.findMany({ where: { userId: user.id, date: dbDate } }),
@@ -139,7 +153,7 @@ export async function getDashboardSnapshot(
         where: { OR: [{ userId: user.id }, { userId: null }] },
         orderBy: [{ isCustom: "asc" }, { name: "asc" }],
       }),
-      prisma.reward.findMany({ where: { userId: user.id, isAvailable: true }, orderBy: { cost: "asc" } }),
+      prisma.reward.findMany({ where: { userId: user.id, isActive: true }, orderBy: { createdAt: "asc" } }),
       prisma.nutritionTarget.findUnique({ where: { userId: user.id } }),
       prisma.pointTransaction.aggregate({ where: { userId: user.id }, _sum: { amount: true } }),
       prisma.journalEntry.findUnique({ where: { userId_date: { userId: user.id, date: dbDate } } }),
@@ -150,6 +164,10 @@ export async function getDashboardSnapshot(
       prisma.habitCompletion.findMany({ where: { userId: user.id, date: { lte: dbDate }, completed: true } }),
       prisma.weeklyReview.findUnique({
         where: { userId_weekStart: { userId: user.id, weekStart: reviewWeekStart } },
+      }),
+      prisma.rewardRedemption.findMany({
+        where: { userId: user.id, weeklyScoreId: weeklyDisciplineScore.id },
+        orderBy: { redeemedAt: "desc" },
       }),
     ]);
 
@@ -286,9 +304,26 @@ export async function getDashboardSnapshot(
       id: reward.id,
       name: reward.name,
       description: reward.description,
+      category: reward.category,
       icon: reward.icon,
-      cost: reward.cost,
-      isAvailable: reward.isAvailable,
+      isActive: reward.isActive,
+    })),
+    weeklyDiscipline: {
+      id: weeklyDisciplineScore.id,
+      weekStartDate: databaseDateString(weeklyDisciplineScore.weekStartDate),
+      weekEndDate: databaseDateString(weeklyDisciplineScore.weekEndDate),
+      plannedCount: weeklyDisciplineScore.plannedCount,
+      completedCount: weeklyDisciplineScore.completedCount,
+      score: Number(weeklyDisciplineScore.score),
+      requiredThreshold: weeklyDisciplineScore.requiredThreshold,
+      isEligible: weeklyDisciplineScore.isEligible,
+      finalized: weeklyDisciplineScore.finalizedAt !== null,
+    },
+    rewardRedemptions: rewardRedemptions.map((redemption) => ({
+      id: redemption.id,
+      rewardId: redemption.rewardId,
+      rewardName: redemption.rewardName,
+      redeemedAt: redemption.redeemedAt.toISOString(),
     })),
     points: transactions._sum.amount ?? 0,
     caloriesTarget: target?.calories ?? 2200,

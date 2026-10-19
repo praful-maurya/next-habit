@@ -9,23 +9,24 @@ datasource db {
 }
 
 model User {
-  id           String             @id @default(cuid())
-  authUserId   String?            @unique
-  email        String             @unique
-  displayName  String             @default("Friend")
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  habits       Habit[]
-  completions  HabitCompletion[]
-  journals     JournalEntry[]
-  foods        Food[]
-  foodLogs     FoodLog[]
-  target       NutritionTarget?
-  transactions PointTransaction[]
-  rewards      Reward[]
-  redemptions  RewardRedemption[]
-  reviews      WeeklyReview[]
-  achievements UserAchievement[]
+  id               String                  @id @default(cuid())
+  authUserId       String?                 @unique
+  email            String                  @unique
+  displayName      String                  @default("Friend")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  habits           Habit[]
+  completions      HabitCompletion[]
+  journals         JournalEntry[]
+  foods            Food[]
+  foodLogs         FoodLog[]
+  target           NutritionTarget?
+  transactions     PointTransaction[]
+  rewards          Reward[]
+  redemptions      RewardRedemption[]
+  disciplineScores WeeklyDisciplineScore[]
+  reviews          WeeklyReview[]
+  achievements     UserAchievement[]
 }
 
 model Habit {
@@ -148,26 +149,52 @@ model Reward {
   userId      String
   name        String
   description String             @default("")
+  category    String             @default("Lifestyle")
   icon        String             @default("gift")
   cost        Int
-  isAvailable Boolean            @default(true)
+  isActive    Boolean            @default(true) @map("isAvailable")
   createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   redemptions RewardRedemption[]
 }
 
+model WeeklyDisciplineScore {
+  id                String             @id @default(cuid())
+  userId            String
+  weekStartDate     DateTime           @db.Date
+  weekEndDate       DateTime           @db.Date
+  plannedCount      Int                @default(0)
+  completedCount    Int                @default(0)
+  score             Decimal            @default(0) @db.Decimal(5, 2)
+  requiredThreshold Int                @default(80)
+  isEligible        Boolean            @default(false)
+  evaluatedAt       DateTime           @default(now())
+  finalizedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemptions       RewardRedemption[]
+
+  @@unique([userId, weekStartDate])
+  @@index([userId, weekEndDate])
+}
+
 model RewardRedemption {
-  id          String   @id @default(cuid())
-  userId      String
-  rewardId    String
-  eventKey    String
-  rewardName  String
-  pointsSpent Int
-  redeemedAt  DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reward      Reward   @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  id            String                 @id @default(cuid())
+  userId        String
+  rewardId      String
+  weeklyScoreId String?
+  eventKey      String
+  rewardName    String
+  pointsSpent   Int
+  redeemedAt    DateTime               @default(now())
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward        Reward                 @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  weeklyScore   WeeklyDisciplineScore? @relation(fields: [weeklyScoreId], references: [id], onDelete: SetNull)
 
   @@unique([userId, eventKey])
+  @@unique([weeklyScoreId, rewardId])
   @@index([userId, redeemedAt])
 }
 

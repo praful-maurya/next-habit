@@ -30,6 +30,20 @@ A multi-user productivity journal for daily habit check-offs, food and nutrition
    npm run dev
    ```
 
+## Deploy to Vercel
+
+1. Push the application to GitHub, then import the repository from the Vercel dashboard. Vercel detects Next.js automatically; use the repository root as the project root and keep the default build command (`npm run build`).
+2. In Vercel **Project Settings → Environment Variables**, add these server-only variables for **Production**:
+   - `DATABASE_URL`: the pooled connection URL for the production Neon branch.
+   - `NEON_AUTH_BASE_URL`: the Managed Auth URL for that same branch.
+   - `NEON_AUTH_COOKIE_SECRET`: a private random value of at least 32 characters.
+   Keep `DATABASE_URL_UNPOOLED` available only to the trusted migration workflow; it is the direct connection URL and must not be exposed to browser code. Never add a `NEXT_PUBLIC_` prefix to these values.
+3. Before the first production deployment, apply committed Prisma migrations to the production Neon branch using its direct URL. The current weekly Reward Vault migration is additive. Do not run production migrations against the pooled URL.
+4. Deploy, then add the resulting production origin (for example, `https://your-app.vercel.app`, without a trailing slash) to the trusted domains for the same Neon Auth branch. If using a custom domain, add that origin too.
+5. Test sign-up, sign-in, sign-out, session restoration, and protected pages against the deployed URL. For production email delivery, configure a custom SMTP provider and enable email verification in Neon Auth.
+
+Use a separate Neon branch and branch-specific `DATABASE_URL` and `NEON_AUTH_BASE_URL` for Vercel Preview deployments. Pointing previews at production can mix test activity into live user data. See [`.env.example`](./.env.example) for the local variable names; enter actual values in Vercel's encrypted environment-variable settings, not in source control.
+
 The first signed-in dashboard request creates an application profile linked to the user's Neon Auth identity, starter habits, sample rewards, estimated food references, and default nutrition targets. Starter habits, rewards, and targets are created per account; built-in food references are shared and read-only. Nutrition reference values are estimates, not medical or dietary advice.
 
 ## Included features

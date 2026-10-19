@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { authenticateApiRequest } from "@/lib/auth/app-user";
 import { dateFromString } from "@/lib/dates";
-import { getLocalUser } from "@/lib/data";
 import { calculateNutrition } from "@/lib/nutrition";
 import { prisma } from "@/lib/prisma";
 import { foodLogSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = foodLogSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Check the food details and try again." }, { status: 400 });
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
 
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const entry = payload.data;
     if (entry.foodId) {
       const food = await prisma.food.findFirst({

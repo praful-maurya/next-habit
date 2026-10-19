@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Activity,
   Apple,
@@ -421,11 +422,11 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
             <p>Small steps, repeated daily, create remarkable change.</p>
             <span>YOUR DAILY REMINDER</span>
           </div>
-          <div className="profile-chip">
-            <div className="profile-avatar">P</div>
-            <div className="profile-details"><strong>{snapshot.displayName || "Friend"}</strong><span>Your personal journal</span></div>
+          <Link href="/settings" className="profile-chip" aria-label="Account settings">
+            <div className="profile-avatar">{(snapshot.displayName || "Friend").charAt(0).toUpperCase()}</div>
+            <div className="profile-details"><strong>{snapshot.displayName || "Friend"}</strong><span>Account settings</span></div>
             <MoreHorizontal size={19} className="profile-more" />
-          </div>
+          </Link>
         </div>
       </aside>
 
@@ -438,7 +439,7 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
           <div className="topbar-right">
             {notice && <span className="saved-indicator"><span />{notice}</span>}
             <label className="date-select"><CalendarDays size={16} /><input aria-label="Selected date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
-            <div className="top-avatar" aria-label="Profile">P</div>
+            <Link href="/settings" className="top-avatar" aria-label="Account settings">{(snapshot.displayName || "Friend").charAt(0).toUpperCase()}</Link>
           </div>
         </header>
 

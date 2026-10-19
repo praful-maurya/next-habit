@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { authenticateApiRequest } from "@/lib/auth/app-user";
 import { dateFromString, isFutureDate } from "@/lib/dates";
-import { getLocalUser } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { completionSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = completionSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Check the habit completion details." }, { status: 400 });
   const { habitId, date, completed, requestId } = payload.data;
@@ -13,10 +16,12 @@ export async function POST(request: NextRequest) {
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
 
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const result = await prisma.$transaction(
       async (transaction) => {
-        const existingRequest = await transaction.pointTransaction.findUnique({ where: { eventKey: requestId } });
+        const existingRequest = await transaction.pointTransaction.findUnique({
+          where: { userId_eventKey: { userId: user.id, eventKey: requestId } },
+        });
         if (existingRequest) return { ok: true };
 
         const habit = await transaction.habit.findFirst({ where: { id: habitId, userId: user.id, status: "ACTIVE" } });

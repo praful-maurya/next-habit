@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { authenticateApiRequest } from "@/lib/auth/app-user";
 import { dateFromString } from "@/lib/dates";
-import { getLocalUser } from "@/lib/data";
 import { calculateNutrition } from "@/lib/nutrition";
 import { prisma } from "@/lib/prisma";
 import { dateSchema } from "@/lib/validation";
@@ -15,11 +15,14 @@ const updateSchema = z.object({
 const duplicateSchema = z.object({ date: dateSchema });
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = updateSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Enter a positive quantity and a valid meal." }, { status: 400 });
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const { id } = await params;
     const existing = await prisma.foodLog.findFirst({ where: { id, userId: user.id } });
     if (!existing) return NextResponse.json({ error: "Food entry not found." }, { status: 404 });
@@ -46,11 +49,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = duplicateSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Choose a valid date for the copied entry." }, { status: 400 });
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const { id } = await params;
     const existing = await prisma.foodLog.findFirst({ where: { id, userId: user.id } });
     if (!existing) return NextResponse.json({ error: "Food entry not found." }, { status: 404 });
@@ -80,9 +86,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const { id } = await params;
     const result = await prisma.foodLog.deleteMany({ where: { id, userId: user.id } });
     if (result.count === 0) return NextResponse.json({ error: "Food entry not found." }, { status: 404 });

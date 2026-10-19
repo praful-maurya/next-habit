@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { getLocalUser } from "@/lib/data";
+import { authenticateApiRequest } from "@/lib/auth/app-user";
 import { prisma } from "@/lib/prisma";
 import { redemptionSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = redemptionSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Check the reward selection and try again." }, { status: 400 });
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
 
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const result = await prisma.$transaction(
       async (transaction) => {
-        if (await transaction.rewardRedemption.findUnique({ where: { eventKey: payload.data.requestId } })) return { ok: true };
+        if (
+          await transaction.rewardRedemption.findUnique({
+            where: { userId_eventKey: { userId: user.id, eventKey: payload.data.requestId } },
+          })
+        ) return { ok: true };
         const reward = await transaction.reward.findFirst({
           where: { id: payload.data.rewardId, userId: user.id, isAvailable: true },
         });

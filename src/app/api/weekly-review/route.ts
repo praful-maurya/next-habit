@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dateFromString, weekdayFromString, previousDate } from "@/lib/dates";
-import { getLocalUser } from "@/lib/data";
+import { authenticateApiRequest } from "@/lib/auth/app-user";
 import { prisma } from "@/lib/prisma";
 import { dateSchema } from "@/lib/validation";
 import { z } from "zod";
@@ -11,11 +11,14 @@ const reviewSchema = z.object({
 });
 
 export async function PUT(request: NextRequest) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = reviewSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Check the weekly reflection fields and try again." }, { status: 400 });
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const weekStart = dateFromString(previousDate(payload.data.date, (weekdayFromString(payload.data.date) + 6) % 7));
     await prisma.weeklyReview.upsert({
       where: { userId_weekStart: { userId: user.id, weekStart } },

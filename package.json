@@ -8,14 +8,16 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy"
+    "db:generate": "node --env-file=.env.local ./node_modules/prisma/build/index.js generate",
+    "db:migrate": "node --env-file=.env.local ./node_modules/prisma/build/index.js migrate dev",
+    "db:deploy": "node --env-file=.env.local ./node_modules/prisma/build/index.js migrate deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@neon/config": "^1.9.2",
     "@neon/env": "^1.6.3",
+    "@neondatabase/auth": "^0.6.0-beta",
+    "@neondatabase/auth-ui": "^0.4.0-beta",
     "@prisma/client": "^6.19.0",
     "bootstrap": "^5.3.8",
     "date-fns": "^4.4.0",

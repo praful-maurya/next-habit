@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authenticateApiRequest } from "@/lib/auth/app-user";
 import { dateFromString } from "@/lib/dates";
-import { getLocalUser } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { journalSchema } from "@/lib/validation";
 
 export async function PUT(request: NextRequest) {
+  const authentication = await authenticateApiRequest();
+  if (!authentication.authenticated) return authentication.response;
+
   const payload = journalSchema.safeParse(await request.json().catch(() => null));
   if (!payload.success) return NextResponse.json({ error: "Check the journal fields and try again." }, { status: 400 });
   if (!process.env.DATABASE_URL) return NextResponse.json({ error: "Configure DATABASE_URL to save changes." }, { status: 503 });
 
   try {
-    const user = await getLocalUser();
+    const user = authentication.user;
     const { date, ...entry } = payload.data;
     await prisma.journalEntry.upsert({
       where: { userId_date: { userId: user.id, date: dateFromString(date) } },

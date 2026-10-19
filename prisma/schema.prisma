@@ -3,12 +3,14 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model User {
   id           String             @id @default(cuid())
+  authUserId   String?            @unique
   email        String             @unique
   displayName  String             @default("Friend")
   createdAt    DateTime           @default(now())
@@ -131,12 +133,13 @@ model FoodLog {
 model PointTransaction {
   id        String   @id @default(cuid())
   userId    String
-  eventKey  String   @unique
+  eventKey  String
   amount    Int
   reason    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, eventKey])
   @@index([userId, createdAt])
 }
 
@@ -157,13 +160,14 @@ model RewardRedemption {
   id          String   @id @default(cuid())
   userId      String
   rewardId    String
-  eventKey    String   @unique
+  eventKey    String
   rewardName  String
   pointsSpent Int
   redeemedAt  DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reward      Reward   @relation(fields: [rewardId], references: [id], onDelete: Restrict)
 
+  @@unique([userId, eventKey])
   @@index([userId, redeemedAt])
 }
 

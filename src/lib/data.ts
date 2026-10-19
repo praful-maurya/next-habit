@@ -12,8 +12,6 @@ import {
 } from "@/lib/dates";
 import type { DashboardSnapshot, DailyTrend } from "@/lib/types";
 
-const LOCAL_USER_EMAIL = "local@my-discipline-journal.invalid";
-
 const sampleHabits = [
   { name: "Move my body", category: "Fitness", icon: "activity", points: 10 },
   { name: "Read for 10 minutes", category: "Learning", icon: "book-open", points: 10 },
@@ -42,21 +40,15 @@ const starterFoods = [
   { name: "Cooked lentils (dal)", category: "Protein", calories: 116, protein: 9, basis: "100g" },
 ];
 
-export async function getLocalUser() {
-  const user = await prisma.user.upsert({
-    where: { email: LOCAL_USER_EMAIL },
-    update: {},
-    create: { email: LOCAL_USER_EMAIL, displayName: "Friend" },
-  });
-
+async function seedPersonalData(userId: string) {
+  const firstHabitId = `seed-${userId}-habit-${sampleHabits[0].icon}`;
+  const firstRewardId = `seed-${userId}-reward-${sampleRewards[0].icon}`;
+  const firstFoodId = `seed-food-${starterFoods[0].name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const [targetSeeded, habitSeeded, rewardSeeded, foodSeeded] = await Promise.all([
-    prisma.nutritionTarget.findUnique({ where: { userId: user.id }, select: { id: true } }),
-    prisma.habit.findUnique({ where: { id: `seed-${sampleHabits[0].icon}` }, select: { id: true } }),
-    prisma.reward.findUnique({ where: { id: `seed-${sampleRewards[0].icon}` }, select: { id: true } }),
-    prisma.food.findUnique({
-      where: { id: `seed-food-${starterFoods[0].name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` },
-      select: { id: true },
-    }),
+    prisma.nutritionTarget.findUnique({ where: { userId }, select: { id: true } }),
+    prisma.habit.findUnique({ where: { id: firstHabitId }, select: { id: true } }),
+    prisma.reward.findUnique({ where: { id: firstRewardId }, select: { id: true } }),
+    prisma.food.findUnique({ where: { id: firstFoodId }, select: { id: true } }),
   ]);
 
   if (!targetSeeded || !habitSeeded || !rewardSeeded || !foodSeeded) {
@@ -64,27 +56,29 @@ export async function getLocalUser() {
       async (transaction) => {
         await transaction.$executeRaw`SELECT pg_advisory_xact_lock(20261017, 1)`;
         await transaction.nutritionTarget.upsert({
-          where: { userId: user.id },
+          where: { userId },
           update: {},
-          create: { userId: user.id, calories: 2200, protein: 120 },
+          create: { userId, calories: 2200, protein: 120 },
         });
         for (const habit of sampleHabits) {
+          const id = `seed-${userId}-habit-${habit.icon}`;
           await transaction.habit.upsert({
-            where: { id: `seed-${habit.icon}` },
+            where: { id },
             update: {},
             create: {
-              id: `seed-${habit.icon}`,
-              userId: user.id,
+              id,
+              userId,
               ...habit,
               startDate: dateFromString(localDateString()),
             },
           });
         }
         for (const reward of sampleRewards) {
+          const id = `seed-${userId}-reward-${reward.icon}`;
           await transaction.reward.upsert({
-            where: { id: `seed-${reward.icon}` },
+            where: { id },
             update: {},
-            create: { id: `seed-${reward.icon}`, userId: user.id, ...reward },
+            create: { id, userId, ...reward },
           });
         }
         for (const food of starterFoods) {
@@ -104,12 +98,13 @@ export async function getLocalUser() {
       { maxWait: 30_000, timeout: 60_000 },
     );
   }
-
-  return user;
 }
 
-export async function getDashboardSnapshot(date = localDateString()): Promise<DashboardSnapshot> {
-  const user = await getLocalUser();
+export async function getDashboardSnapshot(
+  user: { id: string; displayName: string },
+  date = localDateString(),
+): Promise<DashboardSnapshot> {
+  await seedPersonalData(user.id);
   const dbDate = dateFromString(date);
   const weekStart = dateFromString(previousDate(date, 6));
   const datesInMonth = monthDates(date);

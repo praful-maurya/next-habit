@@ -73,13 +73,20 @@ export async function getWeeklyDisciplineScore(userId: string, today: string) {
         const previousWeekDate = previousDate(currentWeekStart);
         await evaluateWeeklyDisciplineScore(transaction, userId, previousWeekDate, true);
         return evaluateWeeklyDisciplineScore(transaction, userId, today);
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 10_000,
+        timeout: 15_000,
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        (error.code === "P2034" || error.code === "P2002") &&
+        (error.code === "P2034" || error.code === "P2002" || error.code === "P2028") &&
         attempt < 2
-      ) continue;
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+        continue;
+      }
       throw error;
     }
   }

@@ -548,7 +548,9 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
                     <ProgressRing value={habitPercent} label="done" tone="habits" />
                     <div><strong>Daily progress</strong><span>{completedHabits} of {scheduledHabits.length} habits complete</span></div>
                   </div>
-                  <div className="streak-pill"><div className="streak-icon"><Flame size={19} /></div><div><strong>{snapshot.streaks.current} {snapshot.streaks.current === 1 ? "day" : "days"}</strong><span>current streak · best {snapshot.streaks.longest}d</span></div></div>
+                  <div className="streak-pill"><div className="streak-icon"><Flame size={19} /></div><div><strong>{snapshot.streaks.current} {snapshot.streaks.current === 1 ? "day" : "days"}</strong>
+                    {/* <span>current streak · best {snapshot.streaks.longest}d</span> */}
+                  </div></div>
                 </div>
               </section>
 

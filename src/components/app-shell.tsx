@@ -60,6 +60,8 @@ import type { DashboardSnapshot, FoodItem } from "@/lib/types";
 import { monthLabel, previousDate, weekdayFromString } from "@/lib/dates";
 import { calculateNutrition } from "@/lib/nutrition";
 import SignOutButton from "@/components/sign-out-button";
+import ThemeToggle from "./theme-toggle";
+// import ThemeToggle from "@/components/theme-toggle";
 
 type Section = "home" | "habits" | "calendar" | "journal" | "diet" | "rewards" | "analytics" | "review";
 
@@ -519,6 +521,7 @@ export default function AppShell({ initialSnapshot }: { initialSnapshot: Dashboa
           <div className="topbar-right">
             {notice && <span className="saved-indicator"><span />{notice}</span>}
             <label className="date-select"><CalendarDays size={16} /><input aria-label="Selected date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
+            <ThemeToggle />
             <Link href="/settings" className="top-avatar" aria-label="Account settings">{(snapshot.displayName || "Friend").charAt(0).toUpperCase()}</Link>
           </div>
         </header>

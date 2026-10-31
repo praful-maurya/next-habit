@@ -1779,6 +1779,9 @@ h1 em {
     width: 284px;
     max-width: 86vw;
     padding: 22px 17px 16px;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .sidebar-collapsed .main-panel,
